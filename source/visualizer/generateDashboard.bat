@@ -1,0 +1,131 @@
+:: ############################################################################
+:: # Batch file to generate ActivitySim HTML Visualizer for MWCOG
+:: #
+:: # 1. User should specify the path to the base and build summaries,
+:: #    the specified directory should have all the files listed in
+:: #    \templates\summaryFilesNames.csv
+:: #
+:: # 2. User should also specify the name of the base and build scenario if the
+:: #    base\build scenario is specified as "CHTS", scenario names are replaced
+:: #    with appropriate Census sources names wherever applicable
+:: ############################################################################
+@ECHO off
+
+set SCEN_NAME=%1
+
+SET SCRIPTS_DIR=%~dp0\scripts
+ECHO SCRIPTS_DIR %SCRIPTS_DIR%
+
+CD %ROOT_DIRECTORY%
+
+:: User Inputs
+:: ###########
+:: Set paths
+SET PROJECT_DIR=%SCEN_DIRECTORY%
+ECHO PROJECT_DIR %PROJECT_DIR%
+SET HTML_OUTPUT_DIR=%SCEN_DIRECTORY%outputs
+SET ABM_DIR=%SCEN_DIRECTORY%outputs\activitysim
+SET ALTERNATIVE_SUMMARY_DIR=%ABM_SUMMARY_DIR%
+SET CENSUS_DIR=%ROOT_DIRECTORY%\source\visualizer\dependencies\data\census
+SET CENSUS_SUMMARY_DIR=%ROOT_DIRECTORY%\source\visualizer\dependencies\data\census\summarized
+SET SKIMS_DIR=%SCEN_DIRECTORY%outputs\skims\OMX_Skims
+SET ZONES_DIR=%ROOT_DIRECTORY%\source\visualizer\dependencies\data\SHP
+SET LAND_USE_DIR=%ABM_DIR%
+SET ASIM_CONFIG_DIR=%ROOT_DIRECTORY%\source\configs\activitysim\configs
+SET SHP_FILE_NAME=TPBTAZ3722_TPBMod.shp
+SET CT_ZERO_AUTO_FILE_NAME=ct_zero_auto.shp
+
+SET SYSTEM_APP_PATH=%ROOT_DIRECTORY%\source\visualizer
+SET SYSTEM_TEMPLATES_PATH=%ROOT_DIRECTORY%\source\visualizer\templates
+SET RUNTIME_PATH=%ABM_SUMMARY_DIR%\runtime
+
+SET RM_GQ=TRUE
+
+SET FULL_HTML_NAME=%BASELINE_SCENARIO_NAME%_vs_%ALTERNATIVE_SCENARIO_NAME%
+
+SET MAX_ITER=1
+SET BASELINE_SAMPLE_RATE=1.0
+SET ALTERNATIVE_SAMPLE_RATE=1.0
+
+ECHO DONE SETTING PATHS
+
+:: Set up dependencies
+:: ###################
+SET R_SCRIPT=%ROOT_DIRECTORY%\source\Visualizer\dependencies\R-4.1.2\bin\Rscript
+SET R_LIBRARY=%ROOT_DIRECTORY%\source\Visualizer\dependencies\R-4.1.2\library
+:: Set PANDOC path
+SET RSTUDIO_PANDOC=%ROOT_DIRECTORY%\source\Visualizer\dependencies\Pandoc
+:: Parameters file
+IF NOT EXIST %RUNTIME_PATH% MKDIR %RUNTIME_PATH%
+SET PARAMETERS_FILE=%RUNTIME_PATH%\parameters.csv
+ECHO PARAMETERS_FILE %PARAMETERS_FILE%
+
+ECHO Key,Value > %PARAMETERS_FILE%
+ECHO PARENT_DIR,%ROOT_DIRECTORY% >> %PARAMETERS_FILE%
+ECHO PROJECT_DIR,%PROJECT_DIR% >> %PARAMETERS_FILE%
+ECHO SCRIPTS_DIR,%SCRIPTS_DIR% >> %PARAMETERS_FILE%
+ECHO HTML_OUTPUT_DIR,%HTML_OUTPUT_DIR% >> %PARAMETERS_FILE%
+ECHO ABM_DIR,%ABM_DIR% >> %PARAMETERS_FILE%
+ECHO ABM_SUMMARY_DIR,%ABM_SUMMARY_DIR% >> %PARAMETERS_FILE%
+ECHO CALIBRATION_DIR,%CALIBRATION_DIR% >> %PARAMETERS_FILE%
+ECHO BASELINE_SUMMARY_DIR,%BASELINE_SUMMARY_DIR% >> %PARAMETERS_FILE%
+ECHO ALTERNATIVE_SUMMARY_DIR,%ALTERNATIVE_SUMMARY_DIR% >> %PARAMETERS_FILE%
+ECHO CENSUS_DIR,%CENSUS_DIR% >> %PARAMETERS_FILE%
+ECHO CENSUS_SUMMARY_DIR,"%CENSUS_SUMMARY_DIR%" >> %PARAMETERS_FILE%
+ECHO SKIMS_DIR,"%SKIMS_DIR%" >> %PARAMETERS_FILE%
+ECHO ZONES_DIR,"%ZONES_DIR%" >> %PARAMETERS_FILE%
+ECHO LAND_USE_DIR,"%LAND_USE_DIR%" >> %PARAMETERS_FILE%
+ECHO ASIM_CONFIG_DIR,"%ASIM_CONFIG_DIR%" >> %PARAMETERS_FILE%
+REM ECHO BASELINE_SUMMARY_DIR_SUBSET,%BASELINE_SUMMARY_DIR_SUBSET% >> %PARAMETERS_FILE%
+ECHO BASELINE_SCENARIO_NAME,%BASELINE_SCENARIO_NAME% >> %PARAMETERS_FILE%
+ECHO ALTERNATIVE_SCENARIO_NAME,%ALTERNATIVE_SCENARIO_NAME% >> %PARAMETERS_FILE%
+ECHO BASELINE_SAMPLE_RATE,%BASELINE_SAMPLE_RATE% >> %PARAMETERS_FILE%
+ECHO ALTERNATIVE_SAMPLE_RATE,%ALTERNATIVE_SAMPLE_RATE% >> %PARAMETERS_FILE%
+ECHO MAX_ITER,%MAX_ITER% >> %PARAMETERS_FILE%
+ECHO R_LIBRARY,%R_LIBRARY% >> %PARAMETERS_FILE%
+ECHO RSTUDIO_PANDOC,%RSTUDIO_PANDOC% >> %PARAMETERS_FILE%
+REM ECHO SUBSET_HTML_NAME,%SUBSET_HTML_NAME% >> %PARAMETERS_FILE%
+ECHO FULL_HTML_NAME,%FULL_HTML_NAME% >> %PARAMETERS_FILE%
+ECHO SHP_FILE_NAME,%SHP_FILE_NAME% >> %PARAMETERS_FILE%
+ECHO CT_ZERO_AUTO_FILE_NAME,%CT_ZERO_AUTO_FILE_NAME% >> %PARAMETERS_FILE%
+ECHO IS_BASE_SURVEY,%IS_BASE_SURVEY% >> %PARAMETERS_FILE%
+ECHO RM_GQ,%RM_GQ% >> %PARAMETERS_FILE%
+ECHO SYSTEM_APP_PATH,%SYSTEM_APP_PATH% >> %PARAMETERS_FILE%
+ECHO SYSTEM_TEMPLATES_PATH,%SYSTEM_TEMPLATES_PATH% >> %PARAMETERS_FILE%
+ECHO RUNTIME_PATH,%RUNTIME_PATH% >> %PARAMETERS_FILE%
+
+:: Cleanup and dump rm_gq information
+DEL /q %ALTERNATIVE_SUMMARY_DIR%\*
+ECHO Key,Value > %ALTERNATIVE_SUMMARY_DIR%\rm_gq.csv
+ECHO RM_GQ,%RM_GQ% >> %ALTERNATIVE_SUMMARY_DIR%\rm_gq.csv
+
+:: Call the R script to generate ActivitySim summaries for visualizer
+:: ############################################################################
+ECHO %startTime%%Time%: Create ActivitySim summary for visualizer...
+%R_SCRIPT% %SCRIPTS_DIR%\main.R %PARAMETERS_FILE%
+IF %ERRORLEVEL% NEQ 0 GOTO MODEL_ERROR
+
+:: Call the master R script to generate full visualizer
+:: #####################################################
+ECHO %startTime%%Time%: Running R script to generate visualizer...
+SET SWITCH=FULL
+%R_SCRIPT% %SCRIPTS_DIR%\Master.R %PARAMETERS_FILE%
+IF %ERRORLEVEL% EQU 11 (
+   ECHO File missing error. Check error file in outputs.
+   ::EXIT \b %errorlevel%
+   GOTO MODEL_ERROR
+)
+IF %ERRORLEVEL% NEQ 0 GOTO MODEL_ERROR
+
+
+ECHO %startTime%%Time%: Dashboard creation complete...
+GOTO END
+
+:MODEL_ERROR
+ECHO Model Failed
+SET ERROR_FLAG=1
+
+:END
+CD %SCEN_DIRECTORY%
+@ECHO ON
+::EXIT

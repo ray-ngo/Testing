@@ -1,0 +1,25 @@
+[project]
+name = "gen3_model"
+version = "1.5.1"
+description = "The gen3_model environment for Activitysim 1.5.1 using UV"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "activitysim==1.5.1",
+    "dbfread>=2.0.7",
+    "dbfwrite>=0.1",
+    "duckdb>=1.4.2",
+    "geopandas==1.1.1",
+    "jupyterlab>=4.5.0",
+    "matplotlib>=3.10.7",
+    "openpyxl>=3.1.5",
+    "plotly>=6.5.0",
+    "polars>=1.35.2",
+    "pyodbc>=5.3.0",
+    "seaborn>=0.13.2",
+    "simpledbf>=0.2.6",
+    "sqlalchemy>=2.0.44",
+    "xarray>=2025.6.1",
+    "xlsxwriter>=3.2.9",
+    "zarr>=2.18.3",
+]
